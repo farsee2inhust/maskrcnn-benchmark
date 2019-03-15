@@ -101,6 +101,11 @@ class MaskRCNNLossComputation(object):
 
         return labels, masks
 
+    def TVLoss(self, x):
+        batch_size = x.size()[0]
+        return (torch.sum(torch.abs(x[:, :, :-1] - x[:, :, 1:])) + torch.sum(
+            torch.abs(x[:, :-1, :] - x[:, 1:, :]))) / batch_size / 28 / 28
+
     def __call__(self, proposals, mask_logits, targets):
         """
         Arguments:
@@ -115,7 +120,6 @@ class MaskRCNNLossComputation(object):
 
         labels = cat(labels, dim=0)
         mask_targets = cat(mask_targets, dim=0)
-
         positive_inds = torch.nonzero(labels > 0).squeeze(1)
         labels_pos = labels[positive_inds]
 
@@ -127,7 +131,10 @@ class MaskRCNNLossComputation(object):
         mask_loss = F.binary_cross_entropy_with_logits(
             mask_logits[positive_inds, labels_pos], mask_targets
         )
-        return mask_loss
+        tv_loss = self.TVLoss(mask_logits[positive_inds, labels_pos])
+        # print(tv_loss)
+
+        return mask_loss + tv_loss
 
 
 def make_roi_mask_loss_evaluator(cfg):
